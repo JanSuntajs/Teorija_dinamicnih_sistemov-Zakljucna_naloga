@@ -1,0 +1,247 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=2.82cm,footskip=1.5cm,includefoot]{geometry}% spremenimo sirine robov
+\usepackage{floatrow}
+\usepackage{units}
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{bm}
+\usepackage{calc}
+\addtolength\hoffset{0.5cm}%horizontalni premik
+%vse pametne funkcije ki jih lahko rabimo (lahko tudi kopiras direktno zraven)
+\include{template}
+
+\usepackage{color}
+
+\author{\normalsize Jan Šuntajs\\ \\\vspace{2mm}
+\normalsize Vpisna številka: 28162015}
+\title{\large Teorija dinamičnih sistemov, študijsko leto 2017/2018 \\ 
+\vspace{3mm}
+\Large Zaključna naloga: Ljapunov spekter verige klasičnih Heisenbergovih spinov s časovno periodično hamiltonko (naloga 14)}
+\date{\normalsize \today}
+
+\begin{document}
+\maketitle
+
+\section{Navodilo}
+
+\emph{Vzemi verigo $N$ klasičnih vrtavk z vrtilnimi količinami $\vec{\Gamma}_j$, $j=1, \dots, N,$ z vezmi $\vec{\Gamma}_j^2=1$, ki jo poganja periodično časovno odvisen Hamiltonian s Heisenbergovo interakcijo}
+\begin{equation}\label{eq:periodic_ham}
+H(t+1)=H(t), \hspace{5mm} H(0<t<1/2)=H_1, \hspace{5mm} H(1/2<t<1)=H_2
+\end{equation}
+
+\begin{equation}\label{eq:trott_suz}
+H_1=J\sum\limits_{j=1}^{N/2}\vec{\Gamma}_{2j-1}\cdot\vec{\Gamma}_{2j}, \hspace{5mm} H_2=J\sum\limits_{j=1}^{N/2}\vec{\Gamma}_{2j}\cdot\vec{\Gamma}_{2j+1}.
+\end{equation}
+\emph{Vzemimo, da je $N$ sod in imamo periodične robne pogoje, $N+1 \equiv 1.$ Uporabi izrek Noetherjeve in pokaži, da je $\sum\limits_{j=1}^N \vec{\Gamma}_j$ vektor konstant gibanja. Izračunaj Ljapunov spekter opisanega modela za nekaj vrednosti $J$, npr. pri $N=4,6,8,10.$}
+
+
+\section{Uvod}
+V uvodnem poglavju izpeljem gibalne enačbe za sistem klasičnih Heisenbergovih spinov, katerih dinamiko določata En. \eqref{eq:periodic_ham} in \eqref{eq:trott_suz}. V nadaljevanju opišem implementacijo Benettinovega algoritma za izračun Ljapunovega spektra modela. 
+\subsection{Enačbe gibanja}
+Gibalna enačba $i$-tega spina v verigi je podana prek Poissonovega oklepaja 
+\begin{equation}\label{eq:eom}
+\frac{\dd}{\dd t} \vec{\Gamma}_i = \{\vec{\Gamma}_i, H \}. 
+\end{equation}
+Pri eksplicitnem izračunu Poissonovega oklepaja sem upošteval zvezo, podano v besedilu zaključne naloge št. 13, in sicer
+\begin{equation}
+\{\Gamma_i^\nu, \Gamma_j^\mu \}  =\sum\limits_\lambda \varepsilon_{\nu\mu\lambda}\delta_{ij}\Gamma_i^\lambda,
+\end{equation}
+kjer indeksi $\nu, \mu$ in $\lambda$ označujejo komponente vektorja vrtilne količine $i$-tega spina $\vec{\Gamma}_i.$ Hamiltonki $H_1$ in $H_2$ v lihe oziroma sode pare sklapljata zgolj po dva sosednja spina. Za prvi spin v paru gibalno enačbo po komponentah zapišemo kot 
+% \begin{equation}
+% \frac{\dd}{\dd t} \sum\limits_{\vec{\Gamma}_i=J\{\vec{\Gamma}_i, \vec{\Gamma}_i\cdot\vec{\Gamma}_{i+1}\}
+% \end{equation}
+
+$$
+\frac{\dd}{\dd t}\sum\limits_\nu \hat{e}^\nu\Gamma_i^\nu =J\sum\limits_{\nu, \mu} \hat{e}^\nu\{\Gamma_i^\nu,\Gamma_i^\mu\Gamma_{i+1}^\mu\}=J\sum\limits_{\nu,\mu}\varepsilon_{\nu\mu\lambda}\hat{e}^\nu\Gamma_i^\lambda\Gamma_{i+1}^\mu.
+$$
+Na desni strani prepoznamo do predznaka natančno izraz za vektorski produkt dveh vektorjev in nazadnje zapišemo
+\begin{equation}\label{eq:eom1}
+\frac{\dd}{\dd t} \vec{\Gamma}_i = -J\ \vec{\Gamma}_i \times \vec{\Gamma}_{i+1}.
+\end{equation}
+Povsem analogno lahko zapišemo tudi enačbo za drugi spin v paru, pri čemer le zamenjamo indeksa $i$ in $i+1$ in dobimo 
+\begin{equation}\label{eq:eom2}
+\frac{\dd}{\dd t} \vec{\Gamma}_{i+1} = J\ \vec{\Gamma}_i \times \vec{\Gamma}_{i+1}.
+\end{equation}
+Od tod že sledi, da se mora pri delovanju hamiltonke ohranjati skupen spin parov sklopljenih spinov, saj je 
+$$
+\frac{\dd}{\dd t} \left( \vec{\Gamma}_i + \vec{\Gamma}_{i+1}\right) = 0.
+$$
+Ker slednje velja za vsak par sklopljenih spinov, število vseh spinov pa je sodo, se seveda ohranja tudi skupen spin celotnega sistema, oziroma $\frac{\dd}{\dd t}  \sum\limits_i \vec{\Gamma}_i=0.$ Povedano velja tako za hamiltonko $H_1$ kot za hamiltonko $H_2$. \\\\Na podoben način se lahko prepričamo še, da gre za konservativen sistem, ki ohranja volumen faznega prostora. Vsota Ljapunovih eksponentov, ki jih bom formalno vpeljal nekoliko kasneje, mora biti torej v takšnem sistemu ničelna. Ponovno obravnavamo par sklopljenih spinov in zanju zapišemo gibalne enačbe
+\begin{equation}
+\frac{\dd}{\dd t} \begin{bmatrix} \vec{\Gamma}_i \\ \vec{\Gamma}_{i+1}\end{bmatrix} = \bm{g}\left(\begin{bmatrix} \vec{\Gamma}_i \\ \vec{\Gamma}_{i+1}\end{bmatrix}\right).
+\end{equation}
+Po komponentah imamo 
+$$
+\frac{\dd}{\dd t} \begin{bmatrix} \Gamma_i^x \\ \Gamma_i^y \\ \Gamma_i^z \\ \Gamma_{i+1}^x \\ \Gamma_{i+1}^y \\ \Gamma_{i+1}^z \end{bmatrix}= 
+J \begin{bmatrix} -\Gamma_i^y\Gamma_{i+1}^z + \Gamma_i^z\Gamma_{i+1}^y \\ -\Gamma_i^z\Gamma_{i+1}^x + \Gamma_i^x\Gamma_{i+1}^z \\ -\Gamma_i^x\Gamma_{i+1}^y + \Gamma_i^y\Gamma_{i+1}^x \\ \Gamma_i^y\Gamma_{i+1}^z - \Gamma_i^z\Gamma_{i+1}^y \\ \Gamma_i^z\Gamma_{i+1}^x - \Gamma_i^x\Gamma_{i+1}^z \\ \Gamma_i^x\Gamma_{i+1}^y - \Gamma_i^y\Gamma_{i+1}^x \end{bmatrix},
+$$
+od koder ni težko preveriti, da je $\mathrm{div}\ \bm{g}\left( \vec{\Gamma}\right)=0$, kar je značilnost konzervativnih sistemov. Ponovno lahko zaradi parne sklopitve spinov zvezo posplošimo na celoten sistem, ne zgolj na par spinov. 
+\subsection{Reševanje gibalnih enačb}
+Zaradi ohranitve skupnega spina para sklopljenih spinov se reševanje gibalnih enačb, ki jih podajata En. \eqref{eq:eom1} in \eqref{eq:eom2}, prevede na problem precesije spinov okrog skupnega spina para $\vec{\Gamma}_i + \vec{\Gamma}_{i+1}$. Slednje je očitno, če pišemo 
+\begin{equation}
+\frac{\dd}{\dd t} \vec{\Gamma}_{i} =  J\ \vec{\Gamma}_i \times \left(\vec{\Gamma}_i + \vec{\Gamma}_{i+1}\right), \hspace{5mm} \frac{\dd}{\dd t} \vec{\Gamma}_{i+1} = - J\ \vec{\Gamma}_{i+1} \times \left( \vec{\Gamma}_i + \vec{\Gamma}_{i+1}\right),
+\end{equation}
+od koder vidimo, da je sprememba vrtilne količine spina sorazmerna navoru zaradi skupnega polja v par sklopljenih spinov. Gre torej za precesijo~\footnote{S problemom precesije smo se srečali denimo pri Klasični mehaniki in semiklasični izpeljavi Blochovih enačb pri jedrski magnetni resonanci.} okrog skupnega spina s precesijsko frekvenco $\omega_p=J$. Rešitev gibalnih enačb sem zapisal z uporabo \emph{Rodriguesove formule} za rotacijo vektorja okrog poljubne enotske osi  v treh dimenzijah. Po rotaciji začetnega vektorja vrtilne količine $\vec{\Gamma}_i$ okrog enotske normale $\hat{k}$ za kot $\theta$ se koordinate rotiranega  vektorja $\vec{\Gamma}^\mathrm{rot}_i$ zapišejo kot 
+\begin{equation}\label{eq:rodrigues}
+\vec{\Gamma}^\mathrm{rot}_i\left(\vec{\Gamma}_i, \hat{k}, \theta \right)=\vec{\Gamma}_i\cos\theta + \left(\hat{k} \times \vec{\Gamma}_i\right)\sin\theta + \hat{k}\left(\hat{k}\cdot \vec{\Gamma}_i\right)\left(1-\cos\theta\right).
+\end{equation}
+Preslikava ohranja normo vektorja vrtilne količine in tako vektor z enotske sfere preslika nazaj na enotsko sfero. 
+V mojem primeru sem vektor $\hat{k}$ usmeril vzdolž vektorske vsote para spinov, za rotacijski kot pa velja $\theta=J\Delta t$, kjer je $\Delta t$ dolžina časovnega intervala, na katerem se spinska konfiguracija razvija v skladu z delovanjem ene izmed hamiltonk, podanih z En. \eqref{eq:trott_suz}.\\\\ Ob upoštevanju časovne periodičnosti hamiltonke, $H(t+1)=H(t)$, sem z uporabo En. \eqref{eq:rodrigues} definiral diskretno stroboskopsko preslikavo, ki dano začetno spinsko konfiguracijo $\vec{\Gamma}(0)$ v času propagira za dolžino ene periode
+\begin{equation}
+\vec{f}(\vec{\Gamma}(0))=\vec{\Gamma}(T=1).
+\end{equation}
+ Sam časovni razvoj sem implementiral kot klasično različico Trotter-Suzukijevega propagatorja - periodo $T$ sem razdelil na dva podintervala polovične dolžine in nato spinsko konfiguracijo na prvem podintervalu propagiral v skladu s hamiltonko $H_1$, na drugem pa v skladu s hamiltonko $H_2$. Začetne spinske konfiguracije sem izžrebal v skladu s pravilom za generiranje enakomerno porazdeljenih smeri na posameznih enotskih sferah, pri čemer je spinska konfiguracija $3N$-dimenzionalen vektor - $N$ zaradi števila spinov, 3 zaradi števila prostostnih stopenj posameznega spina. 
+\subsection{Numerična implementacija rešitve gibalnih enačb}
+Postopek numerične implementacije rešitve gibalnih enačb je razviden iz poročilu priloženega programa, napisanega v programskem jeziku \url{python}. Pred samim izračunom Ljapunovih eksponentov, ki ga zahteva naloga, me je zanimalo, kako dobro so pri časovnem razvoju spinske konfiguracije  upoštevane fizikalne omejitve, denimo zahteva po normiranosti posameznih spinov in zahteva po ohranitvi celotnega spina. Primer časovnega razvoja začetne spinske konfiguracije je prikazan na Slikah~\ref{fig:plot_xyz} in~\ref{fig:plot_phase}, primer časovne odvisnosti energije pa na Sliki~\ref{fig:plot_engy}.  
+\begin{figure}[H]
+\floatbox[{\capbeside\thisfloatsetup{capbesideposition={left,center},capbesidewidth=4 cm}}]{figure}[\FBwidth]
+{\caption{Primer časovnega razvoja komponent vrtilne količine za vsakega izmed spinov v primeru $N=4$ in $J=1$ za neko naključno izžrebano začetno spinsko konfiguracijo. Uvodoma spina $\vec{\Gamma}_1$ in $\vec{\Gamma}_2$ precedirata okrog njunega skupnega spina, enako velja tudi za preostala spina. Na drugi polovici Trotter-Suzukijevega koraka se sklopita spina $\vec{\Gamma}_2$ in $\vec{\Gamma}_3$ oziroma $\vec{\Gamma}_4$ in $\vec{\Gamma}_1$, kar določi nove precesijske osi. }\label{fig:plot_xyz}}
+{\includegraphics[width=0.6\textwidth]{Graphs/plot_xyz_4_.pdf}}
+\end{figure}
+\begin{figure}[H]
+\centering{
+\includegraphics[width=1\textwidth]{Graphs/plot_phase_4_.png}}
+\caption{Fazni portreti prvega spina v primeru $N=4$ v ravninah $z=0$, $x=0$ in $y=0$ za časovni razvoj na intervalu med $t=0$ in $t=1000$. Začetni pogoji niso enaki kot pri grafih na Slikah~\ref{fig:plot_xyz} in~\ref{fig:plot_engy}.}
+\label{fig:plot_phase}
+\end{figure}
+\begin{figure}[H]
+\floatbox[{\capbeside\thisfloatsetup{capbesideposition={left,center},capbesidewidth=4 cm}}]{figure}[\FBwidth]
+{\caption{Prikaz časovne dinamike skupne vrtilne količine para spinov v primeru $N=4$ in $J=1.0$. Z grafov na levi je razvidno, da hamiltonka $H_1$ resnično ne spremeni skupne vrtilne količine za lihe pare spinov, enak sklep velja seveda tudi za grafa na desni v primeru sodih parov spinov in hamiltonke $H_2$. Spina, ki ju medsebojno sklaplja npr. hamiltonka $H_1$, se med delovanjem hamiltonke $H_2$ razvijata neodvisno drug od drugega, zato se v vmesnem časovnem intervalu njuna skupna vrtilna količina spremeni. }\label{fig:plot_spin_pair}}
+{\includegraphics[width=0.7\textwidth]{Graphs/plot_spin_pair_4_.pdf}}
+\end{figure}
+Grafa na Slikah~\ref{fig:norm_cons_4_8_12} in~\ref{fig:spin_cons_4_8_12} prikazujeta analizo odstopanja norme posameznih spinov in celotnega spina sistema od začetnih vrednosti. 
+
+\begin{figure}[H]
+\floatbox[{\capbeside\thisfloatsetup{capbesideposition={left,center},capbesidewidth=5 cm}}]{figure}[\FBwidth]
+{\caption{Časovna odvisnost energije za časovno odvisno hamiltonko, ki jo podaja En. \eqref{eq:periodic_ham}. Energija je konstantna zgolj na intervalih dolžine $\Delta t$, na katerih se kot med sklopljenimi spini ohranja. Ob preklopu med $H_1$ in $H_2$ energija skoči, saj se tedaj spini sklopijo s svojim preostalim najbližjim sosedom, glede na katerega so se predhodno neodvisno časovno razvijali.   }\label{fig:plot_engy}}
+{\includegraphics[width=0.4	\textwidth]{Graphs/plot_engy.pdf}}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering{
+\includegraphics[width=1\textwidth]{Graphs/plot_norm_cons_4_8_12.pdf}}
+\caption{Odstopanje norme posameznih spinov v sistemu od predpisane enotske vrednosti pri propagaciji s Trotter-Suzukijevim polkorakom $\Delta t=0.5$. Odstopanje sčasoma narašča, vendar je tudi po času $t=10^4$ zaznavno šele pod 12. decimalko. Slednje sem moral ustrezno upoštevati pri izbiri dolžine začetnih perturbacijskih vektorjev v Benettinovem algoritmu za izračun eksponentov Ljapunova.}
+\label{fig:norm_cons_4_8_12}
+\end{figure}
+
+\begin{figure}[H]
+\centering{
+\includegraphics[width=1\textwidth]{Graphs/plot_spin_cons_4_8_12.pdf}}
+\caption{Odstopanje skupnega spina po času $t$ od začetne vrednosti po komponentah. Tudi po času $t=10^4$ je odstopanje v okolici 14. decimalke. Tudi v tem primeru je bil uporabljen Trotter-Suzukijev polkorak dolžine $\Delta t=0.5$. }
+\label{fig:spin_cons_4_8_12}
+\end{figure} 
+\section{Eksponentni Ljapunova}
+V tem poglavju predstavim implementacijo Benettinovega algoritma in numerične izračune. Slednje sem deloma izvedel na svojem računalniku, deloma na pa gruči LIPS na odseku F1 na Inštitutu Jožef Stefan. 
+\subsection{Benettinov algoritem in izračun eksponentov Ljapunova}
+Pri implementaciji Benettinovega algoritma sem sledil vsebini predavanj pri predmetu in zapisanemu na spletni strani predmeta. Poleg izbrane spinske konfiguracije $\vec{S}_0$ sem v času z zgoraj opisanim Trotter-Suzukijevim algoritmom propagiral še $3N$ trajektorij z nekoliko perturbiranimi začetnimi pogoji:
+\begin{equation}\label{eq:deviacijski}
+\vec{S}_i(t) = \vec{S}_0(t) + \delta \vec{S}_i (t), \hspace{5mm} i=1, \dots, 3N.
+\end{equation}
+Pri tem $\delta \vec{S}_i$ označuje $i$-ti deviacijski vektor, $\vec{S}_i$ pa ustrezajočo perturbirano spinsko konfiguracijo. Začetne deviacijske vektorje $\vec{S}_i(0)$ sem izžrebal kot vektorje naključnih števil z intervala med $-1$ in $1$, ki sem jih nato normiral na velikost $\tilde{\delta}$. Pri žrebanju naključnih vrednosti sem uporabil funkcijo \url{random.uniform()} iz Pythonove knjižnice \url{numpy}. Pri časovnem razvoju osnovne in perturbiranih konfiguracij sem beležil relativno spremembo velikosti deviacijskih vektorjev 
+$$\tilde{\varepsilon}_i=\frac{\norm{\delta \vec{S}_i(t)}}{\tilde{\delta}}=\frac{\norm{\vec{S}_i(t)-\vec{S}_0(t)}}{\tilde{\delta}}.$$
+V kolikor je katera izmed vrednosti $\tilde{\varepsilon}_i$ ob nekem času $t_k$ presegla vnaprej izbrano mejno vrednost $\tilde{\varepsilon}_\mathrm{gs}$, sem izvedel Gram-Schmidtov postopek, s katerim sem deviacijske vektorje najprej ortogonaliziral:
+\begin{equation}\label{eq:GS}
+\begin{split}
+\delta\vec{\tilde{S}}_1(t_k)&=\delta\vec{S}_1(t_k)\\
+\delta\vec{\tilde{S}}_2(t_k)&=\delta\vec{S}_2(t_k) - \frac{ \delta\vec{S}_2\cdot \delta\vec{\tilde{S}}_1(t_k)}{\left|\delta\vec{\tilde{S}}_1(t_k)\right|^2}\delta\vec{\tilde{S}}_1(t_k)\\
+&\mathrel{\makebox[\widthof{=}]{\vdots}}\\
+\delta\vec{\tilde{S}}_j(t_k)&=\delta\vec{S}_j(t_k) - \sum\limits_{i=1}^{j-1} \frac{ \delta\vec{S}_j\cdot \delta\vec{\tilde{S}}_i(t_k)}{\left|\delta\vec{\tilde{S}}_i(t_k)\right|^2}\delta\vec{\tilde{S}}_i(t_k), \hspace{5mm} j=2, \dots, 3N.
+\end{split}
+\end{equation}
+Po ortogonalizaciji sem velikosti deviacijskih vektorjev še ponastavil nazaj na velikost $\tilde{\delta}$ in shranil vrednosti reskalirnih faktorjev: 
+\begin{equation}\label{eq:rescale}
+\delta \vec{S}_j(t_k) \leftarrow \frac{\delta\vec{\tilde{S}}_j(t_k)}{\left|\delta\vec{\tilde{S}}_j(t_k)\right|}\tilde{\delta}, \hspace{5mm} j=1, \dots, 3N.
+\end{equation}
+Pred nadaljnjo propagacijo sem ponastavil tudi vrednosti perturbiranih spinskih konfiguracij, in sicer z upoštevanjem popravljenih deviacijskih vektorjev v En. \eqref{eq:deviacijski}. Za začetno velikost deviacijskih vektorjev sem tipično izbral vrednost $\tilde{\delta}=10^{-10}$, pred izvedbo zgoraj opisanega korekcijskega postopka pa sem počakal dovolj dolgo, da je relativna sprememba deviacijskih vektorjev dosegla vrednost denimo $\tilde{\varepsilon}_{gs}=10^5$. Simulacijo sem poganjal dovolj dolgo, da se je korekcijski postopek v Benettinovem algoritmu večkrat ponovil. Potem sem $j$-ti Ljapunov eksponent določil kot 
+\begin{equation}
+\lambda_j(t_k)=\frac{1}{t_k}\sum\limits_{l=1}^k \log \frac{\left|\delta\vec{\tilde{S}}_j(t_k)\right|}{\tilde{\delta}},
+\end{equation}
+kjer vsota teče po vseh reskalirnih faktorjih do časa $t_k$. V limiti $t_k\to \infty$ mora veljati 
+$$
+\lambda_j=\lim_{k\to\infty} \lambda_j(t_k).
+$$
+\subsection{Numerični izračuni}
+Na spodnjih grafih so prikazani rezultati numeričnih izračunov Ljapunovega spektra za različne velikosti sistema $N$. Natančnost izračunov sem preverjal glede na ujemanje vsote Ljapunovih eksponentov in ničelne vrednosti, v katero se morajo sešteti vrednosti v Ljapunovem spektru v konzervativnem sistemu. Zaradi zveznosti dinamičnega sistema, ki zagotavlja obstoj vsaj enega ničelnega Ljapunovega eksponenta (ta ustreza majhnim premikom vzdolž orbite), ohranitve velikosti vrtilne količine $N$ spinov in ohranitve 3 komponent skupnega spina sem v spektru pričakoval $N+4$ ničelnih Ljapunovih eksponentov. 
+% Grafi na Slikah~\ref{fig:lyap_coeffs_multi} in~\ref{fig:lyap_coeffs_10} prikazujejo časovni razvoj spektra pri računanju z Benettinovim algoritmom, odstopanje vsote eksponentov od ničelne vrednosti in spekter Ljapunova po dolgem času za različne velikosti sistemov.   
+
+    % J=1.0
+    % nlist=[4,]
+    % tmax=4e04
+    % dt=0.5
+    % eps=1e04
+    % delta=1e-11
+% \subsection{Izračuni pri različnih velikostih sistema}
+\begin{figure}[H]
+\centering{
+\includegraphics[width=0.95\textwidth]{Graphs/plot_lyap_coeffs_J_1_N_4_.pdf}}
+\centering{
+\includegraphics[width=0.95\textwidth]{Graphs/plot_lyap_coeffs_J_1_N_6_.pdf}}
+\centering{
+\includegraphics[width=0.95\textwidth]{Graphs/plot_lyap_coeffs_J_1_N_8_.pdf}}
+\caption{Rezultati numeričnih izračunov Ljapunovega spektra z Benettinovim algoritmom pri $J=1.0$ in $N=4, 6, 8$. Na levi je vsakokrat prikazan časovni razvoj spektra med izvajanjem Benettinovega algoritma, v sredini je prikazano odstopanje vsote Ljapunovih eksponentov od pričakovane ničelne vrednosti, na desni pa Ljapunov spekter z označeno največjo in najmanjšo vrednostjo. Algoritem pravilno napove $N+4$ ničelne vrednosti Ljapunovih eksponentov, odstopanje katerih od točne vrednosti je prikazano na Sliki \ref{fig:N_dependence}. Vrednosti neničelnih Ljapunovih eksponentov nastopajo v konjugiranih parih.  Nedoločene so najmanj do velikosti fluktuacij izračunanih vrednosti na intervalu med $t=10^4$ in $t=10^5$, ki so v primeru $N=4$ znatne. Sodeč po primerjavi z grafi na Sliki~\ref{fig:lyap_coeffs_10} vrednosti maksimalnega Ljapunovega eksponenta alternirajo med vrednostima $\lambda_\mathrm{max}\approx 0.10$ in $\lambda_\mathrm{max}\approx 0.16$ v odvisnosti od števila parov spinov, ki jih na Trotter-Suzukijevih polkorakih sklapljata hamiltonki $H_1$ in $H_2$. Pri izračunih sem uporabil vrednosti $\tilde{\varepsilon}_{gs}=10^4$ in $\tilde{\delta}=10^{-11}$. }
+\label{fig:lyap_coeffs_multi}
+\end{figure}
+    % nlist=[6,]
+    % tmax=4e04
+    % dt=0.5
+    % eps=1e04
+    % delta=1e-11
+
+\begin{figure}[H]
+\centering{
+\includegraphics[width=0.99\textwidth]{Graphs/plot_lyap_coeffs_J_1_N_10_.pdf}}
+\caption{Enaki izračuni kot na Sliki~\ref{fig:lyap_coeffs_multi}, le da za primer $N=8$.}
+\label{fig:lyap_coeffs_10}
+\end{figure}
+
+\begin{figure}[H]
+\floatbox[{\capbeside\thisfloatsetup{capbesideposition={left,center},capbesidewidth=2.7 cm}}]{figure}[\FBwidth]
+{\caption{Spekter Ljapunova v odvisnosti od velikosti sistema in ujemanje eksponentov v sredini spektra s pričakovano ničelno vrednostjo. Odstopanje se vselej pojavi pod tretjo decimalko.  }\label{fig:N_dependence}}
+{\includegraphics[width=0.8\textwidth]{Graphs/plot_N_dependence_J_1_.pdf}}
+\end{figure}
+Z izvajanjem Benettinovega algoritma na časovnem intervalu do $t=10^5$ lahko na podlagi ničelnih vrednosti v spektru Ljapunova do tretje decimalke natančno napovem število ohranjenih količin v sistemu. $N$ ničelnih vrednosti ustreza perturbacijam v smereh pravokotnih na enotske sfere posameznih spinov, 3 ustrezajo perturbacijam, ki ne ohranjajo skupnega spina, preostala ničelna vrednost pa je že omenjena značilnost zveznih dinamičnih sistemov.  
+% \subsection{Izračuni pri različnih vrednostih $J$}
+\\\\
+Za največji obravnavan sistem, torej pri velikosti $N=10$, sem spektre Ljapunova izračunal še pri različnih vrednostih sklopitvene konstante $J$. Vrednosti sem izbiral z intervala med $J=0.1$ in $J=1000$. Rezultate prikazuje Slika~\ref{fig:J_dependence}.
+\begin{figure}[H]
+\floatbox[{\capbeside\thisfloatsetup{capbesideposition={left,center},capbesidewidth=2.7 cm}}]{figure}[\FBwidth]
+{\caption{  }\label{fig:J_dependence}}
+{\includegraphics[width=0.8\textwidth]{Graphs/plot_J_dependence_N_10_.pdf}}
+\end{figure}
+% \begin{figure}[H]
+% \centering{
+% \includegraphics[width=0.99\textwidth]{graf_zum0_62_K0_96n1000N1000wind.pdf}}
+% \caption{S povečevanjem parametra $k$ moramo zlom KAM torusov v okolici zlatega torusa zasledovati na vse manjših skalah in z vedno bolj fino delitvijo intervala vzorčenih začetnih točk. Grafe celotnega intervala vrednosti $y_0$ sem vselej narisal z vzorčenjem 1000 točk na celotnem intervalu, medtem ko sem podrobnejše grafe narisal z vzorčenjem enakega števila točk vendar na znatno manjšem intervalu. Na spodnjem grafu se spremembe v položaju racionalnih aproksimacij zlatega reza dogajajo na peti decimalki.}
+% \label{fig:wind5}
+% \end{figure}
+
+% \begin{figure}[H]
+% \centering{
+% \includegraphics[width=1.\textwidth]{graf_zum0_62_K0_98n1000N1000wind.pdf}}
+% % \caption{}
+% \label{fig:wind8}
+% \end{figure}
+
+% \begin{figure}[H]
+% \floatbox[{\capbeside\thisfloatsetup{capbesideposition={left,center},capbesidewidth=2.7 cm}}]{figure}[\FBwidth]
+% {\caption{Odvisnost $\omega(y_0)$ in fazni portret pri nadkritični vrednosti $k=1.5$. }\label{fig:preprost1}}
+% {\includegraphics[width=0.85\textwidth]{irat_K1_5preprostplot.png}}
+% \end{figure}
+% \begin{figure}[H]
+% \floatbox[{\capbeside\thisfloatsetup{capbesideposition={left,center},capbesidewidth=2.7 cm}}]{figure}[\FBwidth]
+% {\caption{Odvisnost $\omega(y_0)$ in fazni portret pri nadkritični vrednosti $k=3.$. }\label{fig:preprost2}}
+% {\includegraphics[width=0.85\textwidth]{irat_K3preprostplot.png}}
+% \end{figure}
+% \begin{thebibliography}{99}
+% \bibitem{Reichl}
+% L. Reichl, \emph{The transition to chaos}, New York: Springer, (2004).
+% \bibitem{Lichten}
+% R. Lichtenberg, M. Lieberman, \emph{Regular and chaotic dynamics}, New York: Springer-Verlag, (1992)
+
+% \end{thebibliography}
+
+\end{document}
+
+
